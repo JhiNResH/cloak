@@ -1,30 +1,22 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { usePrivy } from "@privy-io/react-auth";
 import CameraCapture from "@/components/CameraCapture";
 import LoadingSpinner from "@/components/LoadingSpinner";
 
-type Step = "login" | "photo" | "details" | "creating";
+type Step = "photo" | "details" | "creating";
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { ready, authenticated, user, login } = usePrivy();
-  const [step, setStep] = useState<Step>("login");
+  const [step, setStep] = useState<Step>("photo");
   const [showCamera, setShowCamera] = useState(false);
   const [photoData, setPhotoData] = useState<string | null>(null);
   const [height, setHeight] = useState("");
   const [weight, setWeight] = useState("");
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (ready && authenticated && step === "login") {
-      setStep("photo");
-    }
-  }, [ready, authenticated, step]);
 
   const handlePhotoCapture = (imageData: string) => {
     setPhotoData(imageData);
@@ -54,7 +46,6 @@ export default function OnboardingPage() {
       formData.append("photo", blob, "avatar.jpg");
       if (height) formData.append("height", height);
       if (weight) formData.append("weight", weight);
-      if (user?.id) formData.append("privyUserId", user.id);
 
       const res = await fetch("/api/avatar", { method: "POST", body: formData });
       if (!res.ok) {
@@ -71,14 +62,6 @@ export default function OnboardingPage() {
     }
   };
 
-  if (!ready) {
-    return (
-      <main className="min-h-dvh bg-background flex items-center justify-center">
-        <LoadingSpinner size="lg" />
-      </main>
-    );
-  }
-
   if (showCamera) {
     return <CameraCapture onCapture={handlePhotoCapture} onCancel={() => setShowCamera(false)} />;
   }
@@ -90,33 +73,14 @@ export default function OnboardingPage() {
           <h1 className="text-3xl font-bold tracking-tight text-primary">Cloak</h1>
           <p className="text-sm text-gray-400 mt-1">Try on the world</p>
         </div>
-
         <div className="mb-6">
           <h2 className="text-xl font-bold text-primary mb-1">
-            {step === "login" && "Get Started"}
-            {step === "photo" && "Create Your Avatar"}
-            {step === "details" && "Almost There"}
-            {step === "creating" && "Creating Avatar"}
+            {step === "photo" ? "Create Your Avatar" : step === "details" ? "Almost There" : "Creating Avatar"}
           </h2>
           <p className="text-gray-500 text-sm">
-            {step === "login" && "Sign in to save your avatar across devices"}
-            {step === "photo" && "Take a photo or upload one to get started"}
-            {step === "details" && "Add details for better size recommendations"}
-            {step === "creating" && "Setting up your virtual try-on experience..."}
+            {step === "photo" ? "Take a photo or upload one to get started" : step === "details" ? "Add details for better size recommendations" : "Setting up your virtual try-on experience..."}
           </p>
         </div>
-
-        {step === "login" && (
-          <div className="flex-1 flex flex-col justify-center gap-4">
-            <button onClick={login} className="btn-primary w-full py-4 flex items-center justify-center gap-3">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              Continue with Email or Google
-            </button>
-            <p className="text-center text-xs text-gray-400">Your data is private and never shared with brands</p>
-          </div>
-        )}
 
         {step === "photo" && (
           <div className="flex-1 flex flex-col gap-4">

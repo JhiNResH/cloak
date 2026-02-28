@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
-import { PrivyProvider } from "@/components/PrivyProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -10,18 +9,10 @@ const geistSans = Geist({
 
 export const metadata: Metadata = {
   title: "Cloak - Virtual Try-On",
-  description: "Try on clothes virtually with AI. Upload a selfie and see how any clothing item looks on you.",
+  description: "Try on clothes virtually with AI.",
   manifest: "/manifest.json",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "Cloak",
-  },
-  openGraph: {
-    title: "Cloak - Virtual Try-On",
-    description: "Try on clothes virtually with AI",
-    type: "website",
-  },
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "Cloak" },
+  openGraph: { title: "Cloak - Virtual Try-On", description: "Try on clothes virtually with AI", type: "website" },
 };
 
 export const viewport: Viewport = {
@@ -32,20 +23,14 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-192x192.svg" />
       </head>
       <body className={`${geistSans.variable} antialiased`}>
-        <PrivyProvider>
-          {children}
-        </PrivyProvider>
+        {children}
       </body>
     </html>
   );
