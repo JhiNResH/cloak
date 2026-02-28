@@ -1,22 +1,30 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { usePrivy } from "@privy-io/react-auth";
 import CameraCapture from "@/components/CameraCapture";
 import LoadingSpinner from "@/components/LoadingSpinner";
 
-type Step = "photo" | "details" | "creating";
+type Step = "login" | "photo" | "details" | "creating";
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const [step, setStep] = useState<Step>("photo");
+  const { ready, authenticated, user, login } = usePrivy();
+  const [step, setStep] = useState<Step>("login");
   const [showCamera, setShowCamera] = useState(false);
   const [photoData, setPhotoData] = useState<string | null>(null);
-  const [height, setHeight] = useState<string>("");
-  const [weight, setWeight] = useState<string>("");
+  const [height, setHeight] = useState("");
+  const [weight, setWeight] = useState("");
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (ready && authenticated && step === "login") {
+      setStep("photo");
+    }
+  }, [ready, authenticated, step]);
 
   const handlePhotoCapture = (imageData: string) => {
     setPhotoData(imageData);
@@ -29,8 +37,7 @@ export default function OnboardingPage() {
     if (file) {
       const reader = new FileReader();
       reader.onload = (event) => {
-        const result = event.target?.result as string;
-        setPhotoData(result);
+        setPhotoData(event.target?.result as string);
         setStep("details");
       };
       reader.readAsDataURL(file);
@@ -41,43 +48,39 @@ export default function OnboardingPage() {
     if (!photoData) return;
     setStep("creating");
     setError(null);
-
     try {
       const formData = new FormData();
-      const response = await fetch(photoData);
-      const blob = await response.blob();
+      const blob = await (await fetch(photoData)).blob();
       formData.append("photo", blob, "avatar.jpg");
       if (height) formData.append("height", height);
       if (weight) formData.append("weight", weight);
+      if (user?.id) formData.append("privyUserId", user.id);
 
-      const res = await fetch("/api/avatar", {
-        method: "POST",
-        body: formData,
-      });
-
+      const res = await fetch("/api/avatar", { method: "POST", body: formData });
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || "Failed to create avatar");
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to create avatar");
       }
-
       const data = await res.json();
       localStorage.setItem("userId", data.userId);
       localStorage.setItem("avatarUrl", data.avatarUrl);
       router.push("/tryon");
     } catch (err) {
-      console.error("Avatar creation error:", err);
-      setError(err instanceof Error ? err.message : "Failed to create avatar. Please try again.");
+      setError(err instanceof Error ? err.message : "Failed. Please try again.");
       setStep("details");
     }
   };
 
-  if (showCamera) {
+  if (!ready) {
     return (
-      <CameraCapture
-        onCapture={handlePhotoCapture}
-        onCancel={() => setShowCamera(false)}
-      />
+      <main className="min-h-dvh bg-background flex items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </main>
     );
+  }
+
+  if (showCamera) {
+    return <CameraCapture onCapture={handlePhotoCapture} onCancel={() => setShowCamera(false)} />;
   }
 
   return (
@@ -90,23 +93,34 @@ export default function OnboardingPage() {
 
         <div className="mb-6">
           <h2 className="text-xl font-bold text-primary mb-1">
+            {step === "login" && "Get Started"}
             {step === "photo" && "Create Your Avatar"}
             {step === "details" && "Almost There"}
             {step === "creating" && "Creating Avatar"}
           </h2>
           <p className="text-gray-500 text-sm">
+            {step === "login" && "Sign in to save your avatar across devices"}
             {step === "photo" && "Take a photo or upload one to get started"}
             {step === "details" && "Add details for better size recommendations"}
             {step === "creating" && "Setting up your virtual try-on experience..."}
           </p>
         </div>
 
+        {step === "login" && (
+          <div className="flex-1 flex flex-col justify-center gap-4">
+            <button onClick={login} className="btn-primary w-full py-4 flex items-center justify-center gap-3">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              Continue with Email or Google
+            </button>
+            <p className="text-center text-xs text-gray-400">Your data is private and never shared with brands</p>
+          </div>
+        )}
+
         {step === "photo" && (
           <div className="flex-1 flex flex-col gap-4">
-            <button
-              onClick={() => setShowCamera(true)}
-              className="card flex flex-col items-center justify-center py-12 hover:shadow-md transition-shadow"
-            >
+            <button onClick={() => setShowCamera(true)} className="card flex flex-col items-center justify-center py-12 hover:shadow-md transition-shadow">
               <div className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center mb-4">
                 <svg className="w-8 h-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -116,11 +130,7 @@ export default function OnboardingPage() {
               <span className="font-medium text-primary">Take a Photo</span>
               <span className="text-sm text-gray-400 mt-1">Use your camera</span>
             </button>
-
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="card flex flex-col items-center justify-center py-12 hover:shadow-md transition-shadow"
-            >
+            <button onClick={() => fileInputRef.current?.click()} className="card flex flex-col items-center justify-center py-12 hover:shadow-md transition-shadow">
               <div className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center mb-4">
                 <svg className="w-8 h-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -129,14 +139,7 @@ export default function OnboardingPage() {
               <span className="font-medium text-primary">Upload Photo</span>
               <span className="text-sm text-gray-400 mt-1">Choose from gallery</span>
             </button>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
           </div>
         )}
 
@@ -147,7 +150,6 @@ export default function OnboardingPage() {
                 <Image src={photoData} alt="Your photo" fill className="object-cover" />
               </div>
             </div>
-
             <div className="space-y-4 mb-8">
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-2">Height (cm) — Optional</label>
@@ -158,9 +160,7 @@ export default function OnboardingPage() {
                 <input type="number" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="65" className="input" />
               </div>
             </div>
-
             {error && <p className="text-red-500 text-sm mb-4 text-center">{error}</p>}
-
             <div className="mt-auto space-y-3">
               <button onClick={handleCreateAvatar} className="btn-primary w-full">Create My Avatar →</button>
               <button onClick={() => { setPhotoData(null); setStep("photo"); }} className="btn-outline w-full">Retake Photo</button>
